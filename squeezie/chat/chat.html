@@ -345,8 +345,8 @@
                 // Charger les badges Twitch
                 this.loadTwitchBadges();
 
-                // Charger les emotes 7TV
-                this.loadSevenTVEmotes();
+                // Charger les emotes 7TV - DÉSACTIVÉ pour Squeezie
+                // this.loadSevenTVEmotes();
 
                 // Démarrer la vérification du chat partagé
                 this.startSharedChatCheck();
@@ -1177,6 +1177,9 @@
                     messageText = rawMessage.substring(privmsgIndex + 'PRIVMSG #squeezie :'.length);
                         // Nettoyer les caractères de fin de ligne
                         messageText = messageText.replace(/\r\n?|\n/g, '');
+                        console.log(`🔍 Message extrait pour ${username}:`, messageText);
+                    } else {
+                        console.log(`⚠️ Impossible d'extraire le message pour ${username} depuis:`, rawMessage);
                     }
 
                     // Extraire les badges depuis les tags IRC
@@ -1203,6 +1206,9 @@
 
                     // Debug - afficher les messages parsés
                     console.log('Message parsé:', { username, messageText, badges, twitchEmotes, userColor, channelInfo, twitchMessageId });
+                    if (badges && Object.keys(badges).length > 0) {
+                        console.log('🏷️ Badges extraits:', Object.keys(badges));
+                    }
 
                     // Vérifier et traiter les commandes de chat
                     if (messageText.trim() && (messageText.startsWith('!chatreload') || messageText.startsWith('!chatrefresh'))) {
@@ -1215,6 +1221,15 @@
 
                     // Ajouter le message au chat seulement s'il y a du texte
                     if (messageText.trim()) {
+                        console.log(`📝 Ajout du message pour ${username}:`, {
+                            nick: username,
+                            text: messageText,
+                            badges: badges,
+                            twitchEmotes: twitchEmotes,
+                            userColor: userColor,
+                            originChannel: channelInfo,
+                            twitchMessageId: twitchMessageId
+                        });
                         this.addMessage({
                             nick: username,
                             text: messageText,
@@ -1224,13 +1239,19 @@
                             originChannel: channelInfo, // facultatif si null
                             twitchMessageId: twitchMessageId // ID Twitch pour la modération
                         });
+                    } else {
+                        console.log(`⚠️ Message vide ignoré pour ${username}`);
                     }
                 } catch (error) {
-                    // console.error('Erreur lors du parsing du message:', error);
+                    console.error('💥 Erreur lors du parsing du message:', error);
+                    console.error('📍 Message brut IRC:', rawMessage);
+                    console.error('📍 Stack trace:', error.stack);
                 }
             }
 
             async loadSevenTVEmotes() {
+                // DÉSACTIVÉ pour Squeezie - pas d'emotes 7TV
+                return;
                 try {
                     // console.log('🚀 Début du chargement des emotes 7TV...');
 
@@ -1357,6 +1378,8 @@
             }
 
             parseSevenTVEmotes(message) {
+                // DÉSACTIVÉ pour Squeezie - pas d'emotes 7TV
+                return message;
                 if (!message) return message;
 
                 try {
@@ -1572,6 +1595,7 @@
                             if (type === 'no-audio' || type === 'no_audio') {
                                 badges.noAudio = true;
                                 badges.noAudioVersion = version;
+                                console.log(`🔊 Badge no-audio/no_audio détecté pour ${username}: version ${version}`);
                             }
                             if (type === 'no-video' || type === 'no_video') {
                                 badges.noVideo = true;
@@ -1732,17 +1756,19 @@
                 messageElement.setAttribute('data-message-id', messageId);
 
                 const username = data.nick || data.username || 'Utilisateur';
+                console.log(`🔍 Message brut pour ${username}:`, data.text || data.message || '');
                 let message = this.cleanMessage(data.text || data.message || '');
+                console.log(`🔍 Message nettoyé pour ${username}:`, message);
 
                 // Parser les emotes Twitch en premier (priorité aux emotes natives)
                 if (data.twitchEmotes) {
                     message = this.parseTwitchEmotes(message, data.twitchEmotes);
                 }
 
-                // Ensuite parser les emotes 7TV sur le texte restant
-                console.log(`🔍 Avant parsing 7TV pour ${username}:`, message);
-                message = this.parseSevenTVEmotes(message);
-                console.log(`🔍 Après parsing 7TV pour ${username}:`, message);
+                // Ensuite parser les emotes 7TV sur le texte restant - DÉSACTIVÉ pour Squeezie
+                // console.log(`🔍 Avant parsing 7TV pour ${username}:`, message);
+                // message = this.parseSevenTVEmotes(message);
+                // console.log(`🔍 Après parsing 7TV pour ${username}:`, message);
 
                 // Déterminer la couleur - priorité à la couleur utilisateur
                 let userColor = '';
@@ -2046,11 +2072,14 @@
                     }
                     // Badge No Audio (listen only)
                     if (data.badges.noAudio) {
+                        console.log(`🔊 Affichage du badge no-audio pour ${username}`);
                         const badgeUrl = this.getBadgeUrl('no-audio', '1');
                         if (badgeUrl) {
                             badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="No Audio" title="Audio désactivé - Écoute uniquement">`;
+                            console.log(`🔊 Badge no-audio affiché avec URL API: ${badgeUrl}`);
                         } else {
                             badgeDisplay += `<img class="badge-image" src="no-audio.png" alt="No Audio" title="Audio désactivé - Écoute uniquement">`;
+                            console.log(`🔊 Badge no-audio affiché avec fallback local`);
                         }
                     }
                     // Badge No Video (listen only)
