@@ -624,6 +624,33 @@
                         console.error('❌ Erreur lors du chargement des badges globaux:', globalResponse.status);
                     }
 
+                    // Charger les badges globaux via l'API alternative pour plus de badges
+                    try {
+                        const altGlobalResponse = await fetch('https://badges.twitch.tv/v1/badges/global/display');
+                        if (altGlobalResponse.ok) {
+                            const altGlobalData = await altGlobalResponse.json();
+                            console.log('📊 Badges globaux alternatifs reçus:', altGlobalData);
+
+                            if (altGlobalData.badge_sets) {
+                                Object.keys(altGlobalData.badge_sets).forEach(badgeId => {
+                                    const badge = altGlobalData.badge_sets[badgeId];
+                                    this.globalBadgeCache.set(badgeId, {
+                                        id: badgeId,
+                                        versions: Object.keys(badge.versions).map(version => ({
+                                            id: version,
+                                            image_url_1x: badge.versions[version].image_url_1x,
+                                            image_url_2x: badge.versions[version].image_url_2x,
+                                            image_url_4x: badge.versions[version].image_url_4x
+                                        }))
+                                    });
+                                });
+                                console.log(`✅ ${Object.keys(altGlobalData.badge_sets).length} badges globaux alternatifs chargés`);
+                            }
+                        }
+                    } catch (altError) {
+                        console.warn('⚠️ Erreur lors du chargement des badges globaux alternatifs:', altError);
+                    }
+
                     console.log(`🏷️ Total badges chargés: ${this.badgeCache.size} chaîne + ${this.globalBadgeCache.size} globaux`);
                 } catch (error) {
                     console.error('💥 Erreur lors du chargement des badges Twitch:', error);
@@ -648,6 +675,61 @@
                         if (badgeVersion) {
                             return badgeVersion.image_url_1x;
                         }
+                    }
+
+                    // Mapping des badges spéciaux vers leurs IDs Twitch
+                    const specialBadgeMapping = {
+                        'prime': 'premium',
+                        'premium': 'premium',
+                        'turbo': 'turbo',
+                        'verified': 'verified',
+                        'twitch-recap-2024': 'twitch-recap-2024',
+                        'twitchrecap-2024': 'twitch-recap-2024',
+                        'rplace-cake-2023': 'rplace-2023',
+                        'rplace-2023': 'rplace-2023',
+                        'glhf-pledge': 'glhf-pledge',
+                        'glhf': 'glhf-pledge',
+                        'GLHF': 'glhf-pledge',
+                        'zevent-2024': 'zevent-2024',
+                        'zevent25': 'zevent-2024',
+                        'zevent-2025': 'zevent-2024',
+                        'speedons-5-badge': 'speedons-5-badge',
+                        'speedons': 'speedons-5-badge',
+                        'marathon-reveal-runner': 'marathon-reveal-runner'
+                    };
+
+                    // Essayer de trouver le badge via le mapping
+                    const mappedBadgeType = specialBadgeMapping[badgeType];
+                    if (mappedBadgeType && this.globalBadgeCache.has(mappedBadgeType)) {
+                        const badge = this.globalBadgeCache.get(mappedBadgeType);
+                        const badgeVersion = badge.versions.find(v => v.id === version) || badge.versions[0];
+                        if (badgeVersion) {
+                            return badgeVersion.image_url_1x;
+                        }
+                    }
+
+                    // Fallback URLs pour les badges spéciaux courants
+                    const fallbackBadgeUrls = {
+                        'zevent25': 'https://static-cdn.jtvnw.net/badges/v1/zevent25/1',
+                        'zevent-2025': 'https://static-cdn.jtvnw.net/badges/v1/zevent25/1',
+                        'marathon-reveal-runner': 'https://static-cdn.jtvnw.net/badges/v1/marathon-reveal-runner/1',
+                        'twitch-recap-2024': 'https://static-cdn.jtvnw.net/badges/v1/twitch-recap-2024/1',
+                        'rplace-2023': 'https://static-cdn.jtvnw.net/badges/v1/rplace-2023/1',
+                        'glhf-pledge': 'https://static-cdn.jtvnw.net/badges/v1/glhf-pledge/1',
+                        'speedons-5-badge': 'https://static-cdn.jtvnw.net/badges/v1/speedons-5-badge/1',
+                        'raging-wolf-helm': 'https://static-cdn.jtvnw.net/badges/v1/raging-wolf-helm/1',
+                        'gone-bananas': 'https://static-cdn.jtvnw.net/badges/v1/gone-bananas/1',
+                        'premium': 'https://static-cdn.jtvnw.net/badges/v1/premium/1',
+                        'prime': 'https://static-cdn.jtvnw.net/badges/v1/premium/1',
+                        'turbo': 'https://static-cdn.jtvnw.net/badges/v1/turbo/1',
+                        'verified': 'https://static-cdn.jtvnw.net/badges/v1/verified/1',
+                        'subtember-2024': 'https://static-cdn.jtvnw.net/badges/v1/subtember-2024/1',
+                        'superultracombo-2023': 'https://static-cdn.jtvnw.net/badges/v1/superultracombo-2023/1',
+                        'no-audio': 'https://static-cdn.jtvnw.net/badges/v1/no-audio/1'
+                    };
+
+                    if (fallbackBadgeUrls[badgeType]) {
+                        return fallbackBadgeUrls[badgeType];
                     }
 
                     // Fallback: retourner null pour utiliser les images locales
@@ -1277,7 +1359,8 @@
             parseSevenTVEmotes(message) {
                 if (!message) return message;
 
-                console.log('🔍 Parsing 7TV emotes pour:', message);
+                try {
+                    console.log('🔍 Parsing 7TV emotes pour:', message);
 
                 // Diviser le message en mots et traiter chaque mot individuellement
                 const words = message.split(/(\s+)/); // Garde les espaces dans le tableau
@@ -1312,10 +1395,15 @@
                                         emoteData.urls[0];
 
                         if (imageUrl) {
-                            const fullUrl = imageUrl.startsWith('//') ? `https:${imageUrl}` : imageUrl;
+                            let fullUrl = imageUrl;
+                            if (imageUrl.startsWith('//')) {
+                                fullUrl = `https:${imageUrl}`;
+                            } else if (!imageUrl.startsWith('http')) {
+                                fullUrl = `https://${imageUrl}`;
+                            }
                             const emoteImg = `<img class="emote-7tv" src="${fullUrl}" alt="${word}" title="${word}">`;
                             words[i] = words[i].replace(word, emoteImg);
-                            // console.log(`🎨 Emote remplacée: "${word}" → ${fullUrl}`);
+                            console.log(`🎨 Emote remplacée: "${word}" → ${fullUrl}`);
                         } else {
                             // console.log(`❌ Pas d'URL d'image valide pour l'emote ${word}`);
                         }
@@ -1354,6 +1442,11 @@
                 }
 
                 return parsedMessage;
+                } catch (error) {
+                    console.error('💥 Erreur lors du parsing des emotes 7TV:', error);
+                    console.error('📍 Message original:', message);
+                    return message; // Retourner le message original en cas d'erreur
+                }
             }
 
             parseTwitchEmotes(message, emoteData) {
@@ -1500,11 +1593,36 @@
                                 badges.artist = true;
                                 badges.artistVersion = version;
                             }
-                            // Badges spéciaux/événements
-                            if (type.includes('game-award') || type.includes('twitchcon') || type.includes('recap') || type.includes('zevent') || type.includes('pixel-heart') || type.includes('arcane') || type.includes('lol') || type.includes('rplace') || type.includes('glhf') || type.includes('glitchcon') || type.includes('share-the-love') || type.includes('subtember') || type.includes('raging-wolf') || type.includes('gone-bananas') || type.includes('speedons') || type.includes('elden-ring')) {
-                                badges.special = true;
-                                badges.specialType = type;
-                                badges.specialVersion = version;
+                            if (type === 'subtember-2024') {
+                                badges.subtember = true;
+                                badges.subtemberVersion = version;
+                            }
+                            if (type === 'superultracombo-2023') {
+                                badges.superultracombo = true;
+                                badges.superultracomboVersion = version;
+                            }
+                            // Badges spéciaux/événements - catch all for any badge not explicitly handled above
+                            else {
+                                // Check if it's a special/event badge by looking for common patterns
+                                // Only process as special if it hasn't been handled by the specific badge types above
+                                if (type.includes('game-award') || type.includes('twitchcon') || type.includes('recap') ||
+                                    type.includes('zevent') || type.includes('pixel-heart') || type.includes('arcane') ||
+                                    type.includes('lol') || type.includes('rplace') || type.includes('glhf') ||
+                                    type.includes('glitchcon') || type.includes('share-the-love') || type.includes('subtember') ||
+                                    type.includes('raging-wolf') || type.includes('gone-bananas') || type.includes('speedons') ||
+                                    type.includes('elden-ring') || type.includes('marathon') || type.includes('twitch-recap') ||
+                                    type.includes('twitchrecap') || type.includes('zevent25') || type.includes('zevent-2024') ||
+                                    type.includes('zevent-2025') || type.includes('rplace-cake') || type.includes('rplace-2023') ||
+                                    type.includes('speedons-5') || type.includes('glhf-pledge') || type.includes('premiere-arcane') ||
+                                    type.includes('gold-pixel') || type.includes('purple-pixel') || type.includes('ruby-pixel') ||
+                                    type.includes('clip-the-hall') || type.includes('banana') || type.includes('elden-ring-wylder') ||
+                                    type.includes('elden-ring-recluse') || type.includes('glitchcon') || type.includes('Glitchcon') ||
+                                    type.includes('superultracombo') || type.includes('sub-gift') ||
+                                    type.includes('bits-leader') || type.includes('clips-leader') || type.includes('predictions')) {
+                                    badges.special = true;
+                                    badges.specialType = type;
+                                    badges.specialVersion = version;
+                                }
                             }
                         });
                     }
@@ -1604,8 +1722,10 @@
             }
 
             addMessage(data) {
-                const messageElement = document.createElement('div');
-                messageElement.className = 'chat-message';
+                try {
+                    console.log(`🚀 addMessage appelé pour: ${data.nick || data.username || 'Unknown'}`);
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'chat-message';
 
                 // Generate unique message ID
                 const messageId = this.generateMessageId();
@@ -1620,7 +1740,9 @@
                 }
 
                 // Ensuite parser les emotes 7TV sur le texte restant
+                console.log(`🔍 Avant parsing 7TV pour ${username}:`, message);
                 message = this.parseSevenTVEmotes(message);
+                console.log(`🔍 Après parsing 7TV pour ${username}:`, message);
 
                 // Déterminer la couleur - priorité à la couleur utilisateur
                 let userColor = '';
@@ -1640,9 +1762,11 @@
                 }
 
                 const badgeClass = this.getUserBadgeClass(data.badges);
+                console.log(`🔍 Badge class pour ${username}:`, badgeClass);
 
                 // Créer l'affichage des badges avec l'API Twitch et fallback local
                 let badgeDisplay = '';
+                console.log(`🔍 Début création des badges pour ${username}`);
                 if (data.badges) {
                     if (data.badges.broadcaster) {
                         const badgeUrl = this.getBadgeUrl('broadcaster', data.badges.broadcasterVersion);
@@ -1895,11 +2019,23 @@
                     }
                     // Badge Prime/Premium
                     if (data.badges.prime || data.badges.premium) {
-                        badgeDisplay += `<img class="badge-image" src="prime.png" alt="Prime" title="Prime Gaming">`;
+                        const badgeUrl = this.getBadgeUrl('prime', '1');
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="Prime" title="Prime Gaming">`;
+                        } else {
+                            // Fallback local
+                            badgeDisplay += `<img class="badge-image" src="prime.png" alt="Prime" title="Prime Gaming" onerror="this.src='https://static-cdn.jtvnw.net/badges/v1/a1dd5073-19c3-4041-a4a4-8d4d9c2e4c0b/1'">`;
+                        }
                     }
                     // Badge Turbo
                     if (data.badges.turbo) {
-                        badgeDisplay += `<img class="badge-image" src="turbo.png" alt="Turbo" title="Turbo">`;
+                        const badgeUrl = this.getBadgeUrl('turbo', '1');
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="Turbo" title="Turbo">`;
+                        } else {
+                            // Fallback local
+                            badgeDisplay += `<img class="badge-image" src="turbo.png" alt="Turbo" title="Turbo" onerror="this.src='https://static-cdn.jtvnw.net/badges/v1/9d9f7f62-80c1-4f47-8b50-6c9a933f0738/1'">`;
+                        }
                     }
                     // Badge Verified
                     if (data.badges.verified) {
@@ -1910,67 +2046,128 @@
                     }
                     // Badge No Audio (listen only)
                     if (data.badges.noAudio) {
-                        badgeDisplay += `<img class="badge-image" src="no-audio.png" alt="No Audio" title="Audio désactivé - Écoute uniquement">`;
+                        const badgeUrl = this.getBadgeUrl('no-audio', '1');
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="No Audio" title="Audio désactivé - Écoute uniquement">`;
+                        } else {
+                            badgeDisplay += `<img class="badge-image" src="no-audio.png" alt="No Audio" title="Audio désactivé - Écoute uniquement">`;
+                        }
                     }
                     // Badge No Video (listen only)
                     if (data.badges.noVideo) {
-                        badgeDisplay += `<img class="badge-image" src="listen.png" alt="Listen Only" title="Écoute uniquement - Pas de vidéo">`;
+                        const badgeUrl = this.getBadgeUrl('no-video', '1');
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="Listen Only" title="Écoute uniquement - Pas de vidéo">`;
+                        } else {
+                            badgeDisplay += `<img class="badge-image" src="listen.png" alt="Listen Only" title="Écoute uniquement - Pas de vidéo">`;
+                        }
                     }
                     // Badge DJ
                     if (data.badges.dj) {
-                        badgeDisplay += `<img class="badge-image" src="dj.png" alt="DJ" title="Twitch DJ">`;
+                        const badgeUrl = this.getBadgeUrl('dj', '1');
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="DJ" title="Twitch DJ">`;
+                        } else {
+                            badgeDisplay += `<img class="badge-image" src="dj.png" alt="DJ" title="Twitch DJ">`;
+                        }
                     }
                     // Badge Ambassador
                     if (data.badges.ambassador) {
-                        badgeDisplay += `<img class="badge-image" src="ambassador.png" alt="Ambassador" title="Twitch Ambassador">`;
+                        const badgeUrl = this.getBadgeUrl('ambassador', '1');
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="Ambassador" title="Twitch Ambassador">`;
+                        } else {
+                            badgeDisplay += `<img class="badge-image" src="ambassador.png" alt="Ambassador" title="Twitch Ambassador">`;
+                        }
                     }
                     // Badge Anonymous Cheerer
                     if (data.badges.anonymousCheerer) {
-                        badgeDisplay += `<img class="badge-image" src="anonymous-cheerer.png" alt="Anonymous Cheerer" title="Cheerer Anonyme">`;
+                        const badgeUrl = this.getBadgeUrl('anonymous-cheerer', '1');
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="Anonymous Cheerer" title="Cheerer Anonyme">`;
+                        } else {
+                            badgeDisplay += `<img class="badge-image" src="anonymous-cheerer.png" alt="Anonymous Cheerer" title="Cheerer Anonyme">`;
+                        }
                     }
                     // Badge Artist
                     if (data.badges.artist) {
-                        badgeDisplay += `<img class="badge-image" src="Artist.png" alt="Artist" title="Artiste">`;
+                        const badgeUrl = this.getBadgeUrl('artist-badge', '1');
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="Artist" title="Artiste Twitch">`;
+                        } else {
+                            badgeDisplay += `<img class="badge-image" src="Artist.png" alt="Artist" title="Artiste">`;
+                        }
                     }
                     // Badges spéciaux/événements
                     if (data.badges.special) {
                         const specialType = data.badges.specialType;
+                        let badgeUrl = null;
                         let specialBadgeFile = '';
 
-                        // Mapper les badges spéciaux
-                        if (specialType.includes('game-award-2023')) specialBadgeFile = 'game-award-2023.png';
-                        else if (specialType.includes('golden-predictor-game-award-2023')) specialBadgeFile = 'golden-predictor-game-award-2023.png';
-                        else if (specialType.includes('twitchcon-2025')) specialBadgeFile = 'twitchcon-2025.png';
-                        else if (specialType.includes('twitchrecap-2024') || specialType.includes('twitch-recap-2024')) specialBadgeFile = 'twitch-recap-2024.png';
-                        else if (specialType.includes('twitch-recap-2023') || specialType.includes('twitchrecap-2023')) specialBadgeFile = 'twitch-recap-2023.png';
-                        else if (specialType.includes('twitch-inter-2023')) specialBadgeFile = 'twitch-inter-2023.png';
-                        else if (specialType.includes('zevent-2024')) specialBadgeFile = 'zevent-2024.png';
-                        else if (specialType.includes('subtember-2024')) specialBadgeFile = 'subtember-2024.png';
-                        else if (specialType.includes('lol-mid-season-2025-support')) specialBadgeFile = 'lol-mid-season-2025-support-a-streamer.png';
-                        else if (specialType.includes('lol-mid-season-2025')) specialBadgeFile = 'lol-mid-season-2025.png';
-                        else if (specialType.includes('premiere-arcane-2') || specialType.includes('arcane-season-2-premiere')) specialBadgeFile = 'premiere-arcane-2.png';
-                        else if (specialType.includes('rplace-cake-2023') || specialType.includes('rplace-2023')) specialBadgeFile = 'rplace-cake-2023.png';
-                        else if (specialType.includes('share-the-love')) specialBadgeFile = 'share-the-love.png';
-                        else if (specialType.includes('gold-pixel-hear-2024')) specialBadgeFile = 'gold-pixel-hear-2024.png';
-                        else if (specialType.includes('purple-pixel-hear-2024') || specialType.includes('purple-pixel-heart---together-for-good-24')) specialBadgeFile = 'purple-pixel-heart-2024.png';
-                        else if (specialType.includes('ruby-pixel-heart-2024')) specialBadgeFile = 'ruby-pixel-heart-2024.png';
-                        else if (specialType.includes('clip-the-hall')) specialBadgeFile = 'clip-the-hall.png';
-                        else if (specialType.includes('raging-wolf')) specialBadgeFile = 'raging-wolf.png';
-                        else if (specialType.includes('gone-bananas')) specialBadgeFile = 'banana.png';
-                        else if (specialType.includes('speedons-5-badge') || specialType.includes('speedons')) specialBadgeFile = 'speedons-5.png';
-                        else if (specialType.includes('elden-ring-wylder')) specialBadgeFile = 'elden-ring-wylder.png';
-                        else if (specialType.includes('elden-ring-recluse')) specialBadgeFile = 'elden-ring-recluse.png';
-                        else if (specialType.includes('glhf') || specialType.includes('GLHF')) specialBadgeFile = 'GLHF.png';
-                        else if (specialType.includes('glitchcon') || specialType.includes('Glitchcon')) specialBadgeFile = 'Glitchcon.png';
+                        // Essayer d'abord l'API Twitch pour les badges spéciaux
+                        if (specialType.includes('twitchrecap-2024') || specialType.includes('twitch-recap-2024')) {
+                            badgeUrl = this.getBadgeUrl('twitch-recap-2024', '1');
+                        } else if (specialType.includes('rplace-cake-2023') || specialType.includes('rplace-2023')) {
+                            badgeUrl = this.getBadgeUrl('rplace-cake-2023', '1');
+                        } else if (specialType.includes('zevent-2024') || specialType.includes('zevent25') || specialType.includes('zevent-2025')) {
+                            badgeUrl = this.getBadgeUrl('zevent25', '1');
+                        } else if (specialType.includes('speedons-5-badge') || specialType.includes('speedons')) {
+                            badgeUrl = this.getBadgeUrl('speedons-5-badge', '1');
+                        } else if (specialType.includes('glhf') || specialType.includes('GLHF') || specialType.includes('glhf-pledge')) {
+                            badgeUrl = this.getBadgeUrl('glhf-pledge', '1');
+                        } else if (specialType.includes('marathon')) {
+                            badgeUrl = this.getBadgeUrl(specialType, '1');
+                        } else if (specialType.includes('raging-wolf')) {
+                            badgeUrl = this.getBadgeUrl('raging-wolf-helm', '1');
+                        } else if (specialType.includes('gone-bananas')) {
+                            badgeUrl = this.getBadgeUrl('gone-bananas', '1');
+                        } else if (specialType.includes('premium') || specialType.includes('prime')) {
+                            badgeUrl = this.getBadgeUrl('premium', '1');
+                        } else if (specialType.includes('subtember')) {
+                            badgeUrl = this.getBadgeUrl('subtember-2024', '1');
+                        } else if (specialType.includes('superultracombo')) {
+                            badgeUrl = this.getBadgeUrl('superultracombo-2023', '1');
+                        } else if (specialType.includes('no-audio') || specialType.includes('no_audio')) {
+                            badgeUrl = this.getBadgeUrl('no-audio', '1');
+                        } else {
+                            // Try to get any other special badge directly
+                            badgeUrl = this.getBadgeUrl(specialType, '1');
+                        }
 
-                        if (specialBadgeFile) {
-                            badgeDisplay += `<img class="badge-image" src="${specialBadgeFile}" alt="${specialType}" title="${specialType}">`;
+                        if (badgeUrl) {
+                            badgeDisplay += `<img class="badge-image" src="${badgeUrl}" alt="${specialType}" title="${specialType}">`;
+                        } else {
+                            // Fallback vers les fichiers locaux pour les autres badges spéciaux
+                            if (specialType.includes('game-award-2023')) specialBadgeFile = 'game-award-2023.png';
+                            else if (specialType.includes('golden-predictor-game-award-2023')) specialBadgeFile = 'golden-predictor-game-award-2023.png';
+                            else if (specialType.includes('twitchcon-2025')) specialBadgeFile = 'twitchcon-2025.png';
+                            else if (specialType.includes('twitch-recap-2023') || specialType.includes('twitchrecap-2023')) specialBadgeFile = 'twitch-recap-2023.png';
+                            else if (specialType.includes('twitch-inter-2023')) specialBadgeFile = 'twitch-inter-2023.png';
+                            else if (specialType.includes('subtember-2024')) specialBadgeFile = 'subtember-2024.png';
+                            else if (specialType.includes('lol-mid-season-2025-support')) specialBadgeFile = 'lol-mid-season-2025-support-a-streamer.png';
+                            else if (specialType.includes('lol-mid-season-2025')) specialBadgeFile = 'lol-mid-season-2025.png';
+                            else if (specialType.includes('premiere-arcane-2') || specialType.includes('arcane-season-2-premiere')) specialBadgeFile = 'premiere-arcane-2.png';
+                            else if (specialType.includes('share-the-love')) specialBadgeFile = 'share-the-love.png';
+                            else if (specialType.includes('gold-pixel-hear-2024')) specialBadgeFile = 'gold-pixel-hear-2024.png';
+                            else if (specialType.includes('purple-pixel-hear-2024') || specialType.includes('purple-pixel-heart---together-for-good-24')) specialBadgeFile = 'purple-pixel-heart-2024.png';
+                            else if (specialType.includes('ruby-pixel-heart-2024')) specialBadgeFile = 'ruby-pixel-heart-2024.png';
+                            else if (specialType.includes('clip-the-hall')) specialBadgeFile = 'clip-the-hall.png';
+                            else if (specialType.includes('raging-wolf')) specialBadgeFile = 'raging-wolf.png';
+                            else if (specialType.includes('gone-bananas')) specialBadgeFile = 'banana.png';
+                            else if (specialType.includes('elden-ring-wylder')) specialBadgeFile = 'elden-ring-wylder.png';
+                            else if (specialType.includes('elden-ring-recluse')) specialBadgeFile = 'elden-ring-recluse.png';
+                            else if (specialType.includes('glitchcon') || specialType.includes('Glitchcon')) specialBadgeFile = 'Glitchcon.png';
+
+                            if (specialBadgeFile) {
+                                badgeDisplay += `<img class="badge-image" src="${specialBadgeFile}" alt="${specialType}" title="${specialType}">`;
+                            }
                         }
                     }
                 }
 
                 // Créer l'image de la chaîne d'origine si disponible ET si le chat partagé est actif
                 let originImageHTML = '';
+                console.log(`🔍 Création de l'image d'origine pour ${username}`);
                 if (data.originChannel && data.originChannel.profileImage && this.isSharedChatActive) {
                     console.log(`🏢 Affichage de l'icône de chaîne d'origine (chat partagé actif): ${data.originChannel.displayName}`);
                     originImageHTML = `<img class="badge-image origin-channel" src="${data.originChannel.profileImage}" alt="${data.originChannel.displayName}" title="Chaîne d'origine: ${data.originChannel.displayName}" style="width: 22px; height: 22px; border-radius: 4px; margin-right: 6px; object-fit: cover; vertical-align: middle;">`;
@@ -1978,6 +2175,7 @@
                     console.log(`🚫 Icône de chaîne d'origine masquée (chat partagé inactif): ${data.originChannel.displayName}`);
                 }
 
+                console.log(`🔍 Création du HTML pour ${username}`);
                 messageElement.innerHTML = `
                     <span class="badge-display">
                         ${originImageHTML}
@@ -1987,9 +2185,12 @@
                     <span class="separator">:</span>
                     <span class="message-content">${message}</span>
                 `;
+                console.log(`🔍 HTML créé pour ${username}`);
 
                 // Ajouter le message au container
+                console.log(`📝 Ajout du message au DOM: ${username} - ${message.substring(0, 50)}...`);
                 this.container.appendChild(messageElement);
+                console.log(`✅ Message ajouté au DOM. Total messages: ${this.container.children.length}`);
 
                 // Store message data for potential deletion with Twitch message ID
                 this.messages.set(messageId, {
@@ -2015,11 +2216,21 @@
 
                 // Faire défiler vers le bas
                 this.scrollToBottom();
+                } catch (error) {
+                    console.error(`💥 Erreur dans addMessage pour ${data.nick || data.username || 'Unknown'}:`, error);
+                    console.error('📍 Stack trace:', error.stack);
+                    console.error('📍 Données du message:', data);
+                }
             }
 
             limitMessages() {
+                const initialCount = this.container.children.length;
                 while (this.container.children.length > this.maxMessages) {
-                    this.container.removeChild(this.container.firstChild);
+                    const removedElement = this.container.removeChild(this.container.firstChild);
+                    console.log(`🗑️ Message supprimé par limite: ${removedElement.querySelector('.username')?.textContent || 'Unknown'}`);
+                }
+                if (initialCount !== this.container.children.length) {
+                    console.log(`📊 Limite appliquée: ${initialCount} → ${this.container.children.length} messages`);
                 }
             }
 
@@ -2095,25 +2306,25 @@
                 console.log('📋 Toutes les polices chargées:', Array.from(document.fonts).map(font => font.family));
 
                 // Vérifier spécifiquement notre police
-                const seaFuguFont = Array.from(document.fonts).find(font =>
-                    font.family.includes('Sea Regular Fugu')
+                const fredokaFont = Array.from(document.fonts).find(font =>
+                    font.family.includes('Fredoka One')
                 );
 
-                if (seaFuguFont) {
-                    console.log('✅ Police "Sea Regular Fugu" trouvée:', seaFuguFont);
-                    console.log('📊 Status de la police:', seaFuguFont.status);
+                if (fredokaFont) {
+                    console.log('✅ Police "Fredoka One" trouvée:', fredokaFont);
+                    console.log('📊 Status de la police:', fredokaFont.status);
                 } else {
-                    console.log('❌ Police "Sea Regular Fugu" non trouvée dans les polices chargées');
+                    console.log('❌ Police "Fredoka One" non trouvée dans les polices chargées');
                 }
 
                 // Utiliser l'API moderne pour vérifier le chargement
-                document.fonts.check('16px "Sea Regular Fugu"') ?
-                    console.log('✅ API fonts.check(): Police "Sea Regular Fugu" chargée') :
-                    console.log('❌ API fonts.check(): Police "Sea Regular Fugu" non chargée');
+                document.fonts.check('16px "Fredoka One"') ?
+                    console.log('✅ API fonts.check(): Police "Fredoka One" chargée') :
+                    console.log('❌ API fonts.check(): Police "Fredoka One" non chargée');
             }
 
             // Test de largeur pour vérifier le chargement
-            const fontLoadedByWidth = isFontLoaded('Sea Regular Fugu');
+            const fontLoadedByWidth = isFontLoaded('Fredoka One');
 
             // Vérifier la police calculée sur le body
             const bodyElement = document.body;
@@ -2124,7 +2335,7 @@
 
             // Créer un élément de test pour vérifier la police
             const testElement = document.createElement('div');
-            testElement.style.fontFamily = '"Sea Regular Fugu", "Comic Sans MS", "Trebuchet MS", "Arial Black", Arial, sans-serif';
+            testElement.style.fontFamily = '"Fredoka One", "Comic Sans MS", "Trebuchet MS", "Arial Black", Arial, sans-serif';
             testElement.style.position = 'absolute';
             testElement.style.left = '-9999px';
             testElement.textContent = 'Test Font';
@@ -2139,8 +2350,8 @@
             document.body.removeChild(testElement);
 
             // Vérifier si la police personnalisée est utilisée
-            if (actualFont.includes('Sea Regular Fugu')) {
-                console.log('🎉 SUCCESS: La police "Sea Regular Fugu" est active !');
+            if (actualFont.includes('Fredoka One')) {
+                console.log('🎉 SUCCESS: La police "Fredoka One" est active !');
             } else if (actualFont.includes('Comic Sans MS')) {
                 console.log('⚠️ WARNING: Utilisation de la police fallback "Comic Sans MS"');
             } else {
@@ -2150,7 +2361,7 @@
             // Résumé final
             console.log('📝 RÉSUMÉ:');
             console.log(`   - Police chargée (test largeur): ${fontLoadedByWidth ? '✅' : '❌'}`);
-            console.log(`   - Police active dans CSS: ${actualFont.includes('Sea Regular Fugu') ? '✅' : '❌'}`);
+            console.log(`   - Police active dans CSS: ${actualFont.includes('Fredoka One') ? '✅' : '❌'}`);
         }
 
         // Initialiser le widget quand la page est chargée
@@ -2179,8 +2390,8 @@
                 });
 
                 // Forcer le chargement de notre police
-                document.fonts.load('16px "Sea Regular Fugu"').then(() => {
-                    console.log('✅ Police "Sea Regular Fugu" chargée explicitement via fonts.load()');
+                document.fonts.load('16px "Fredoka One"').then(() => {
+                    console.log('✅ Police "Fredoka One" chargée explicitement via fonts.load()');
                     checkLoadedFonts();
                 }).catch((error) => {
                     console.log('❌ Erreur lors du chargement explicite de la police:', error);
