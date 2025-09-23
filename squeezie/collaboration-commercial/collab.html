@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaboration Commercial</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: 'Fredoka One', cursive;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .main-title {
+            font-size: 32px;
+            font-weight: 400;
+            margin: 0;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            font-size: 24px;
+            font-weight: 400;
+            margin: 5px 0 0 0;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+        }
+
+        .subtitle::before {
+            content: "!";
+            color: #ff6b6b;
+            font-size: 28px;
+        }
+
+        /* Position classes */
+        .position-haut .container {
+            top: 20px;
+        }
+
+        .position-bas .container {
+            top: auto;
+            bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="main-title">COLLABORATION COMMERCIAL</h1>
+        <div class="subtitle" id="game-subtitle"></div>
+    </div>
+
+    <script>
+        // Function to get URL parameters
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Get the game parameter from URL
+        const game = getUrlParameter('jeu');
+        const position = getUrlParameter('haut') || getUrlParameter('bas');
+
+        // Set the game subtitle if provided
+        if (game) {
+            document.getElementById('game-subtitle').textContent = game;
+        }
+
+        // Set position class
+        if (position === 'haut') {
+            document.body.classList.add('position-haut');
+        } else if (position === 'bas') {
+            document.body.classList.add('position-bas');
+        }
+    </script>
+</body>
+</html>
