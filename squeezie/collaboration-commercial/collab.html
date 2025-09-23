@@ -19,6 +19,7 @@
             top: 20px;
             left: 20px;
             display: flex;
+			flex-direction: column;
             align-items: center;
         }
 
@@ -58,17 +59,6 @@
             color: white;
             font-size: 28px;
         }
-
-        /* Position classes */
-        .position-haut .container {
-            top: 20px;
-            bottom: auto;
-        }
-
-        .position-bas .container {
-            top: auto;
-            bottom: 20px;
-        }
     </style>
 </head>
 <body>
@@ -86,7 +76,9 @@
 
         // Get the game parameter from URL
         const game = getUrlParameter('jeu');
-        const position = getUrlParameter('haut') || getUrlParameter('bas');
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasHaut = urlParams.has('haut');
+        const hasBas = urlParams.has('bas');
 
         // Set the game subtitle if provided
         if (game) {
@@ -94,9 +86,9 @@
         }
 
         // Set position class
-        if (position === 'haut') {
+        if (hasHaut) {
             document.body.classList.add('position-haut');
-        } else if (position === 'bas') {
+        } else if (hasBas) {
             document.body.classList.add('position-bas');
         }
     </script>
