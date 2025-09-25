@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Overlay</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: transparent;
+            font-family: Arial, sans-serif;
+        }
+
+        .top-bar {
+			width: 75%;
+            margin: 20px 0 0 20px; /* Gap on top, left and right sides */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .bar {
+            width: 100%;
+            height: 5px;
+            background-color: #ffffff;
+            border-radius: 5px;
+        }
+
+        .date-display {
+    		color: white;
+    		font-family: 'Fredoka One', cursive;
+    		font-size: 19px;
+    		font-weight: normal;
+    		text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+		}
+
+        .logo-display {
+            display: flex;
+            align-items: center;
+        }
+
+        .center-text {
+            color: white;
+            font-family: 'Fredoka One', cursive;
+            font-size: 16px;
+            font-weight: normal;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            text-align: center;
+        }
+
+        .widget-container {
+            position: fixed;
+            bottom: 0px;
+            z-index: 10;
+        }
+
+        .widget-iframe {
+            border: none;
+            background: transparent;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <div class="content-row">
+            <div class="date-display" id="currentDate"></div>
+            <div class="center-text">COLLABORATION COMMERCIAL</div>
+            <div class="logo-display">
+                <img src="image/logo-ciao.png" alt="Logo">
+            </div>
+        </div>
+        <div class="bar"></div>
+    </div>
+
+    <!-- Widget Valorant intégré -->
+    <div class="widget-container">
+        <iframe
+            src="rank-valorant/rang-widget.html"
+            class="widget-iframe"
+            width="300"
+            height="60"
+            title="Valorant Rank Widget">
+        </iframe>
+    </div>
+
+    <script>
+        function updateDate() {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const dateString = `${day}/${month}/${year}`;
+            document.getElementById('currentDate').textContent = dateString;
+        }
+
+        // Update date immediately and then every minute
+        updateDate();
+        setInterval(updateDate, 60000);
+    </script>
+</body>
+</html>
